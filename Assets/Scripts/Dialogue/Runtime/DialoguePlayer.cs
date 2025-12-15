@@ -42,6 +42,22 @@ namespace CivilizationJourney.Dialogue
         public int CurrentSceneIndex => currentSceneIndex;
         public int CurrentLineIndex => currentLineIndex;
 
+        /// <summary>
+        /// 设置对话UI引用（供DialogueLoader调用）
+        /// </summary>
+        public void SetDialogueUI(DialogueUI ui)
+        {
+            dialogueUI = ui;
+        }
+
+        /// <summary>
+        /// 设置对话数据（供DialogueLoader调用）
+        /// </summary>
+        public void SetDialogueData(DialogueData data)
+        {
+            currentDialogue = data;
+        }
+
         private void Start()
         {
             if (autoStart && currentDialogue != null)
