@@ -25,6 +25,9 @@ namespace CivilizationJourney.Dialogue
         [Tooltip("是否自动创建对话UI（如果场景中没有的话）")]
         public bool autoCreateUI = true;
 
+        [Tooltip("自定义字体（将TMP字体资源拖到这里）")]
+        public TMP_FontAsset customFont;
+
         [Header("调试")]
         [Tooltip("显示调试信息")]
         public bool showDebugInfo = false;
@@ -220,6 +223,7 @@ namespace CivilizationJourney.Dialogue
             nameText.fontStyle = FontStyles.Bold;
             nameText.color = Color.white;
             nameText.alignment = TextAlignmentOptions.Center;
+            if (customFont != null) nameText.font = customFont;
             SetFullStretch(nameTextGO.GetComponent<RectTransform>());
             nameTextGO.GetComponent<RectTransform>().offsetMin = new Vector2(10, 5);
             nameTextGO.GetComponent<RectTransform>().offsetMax = new Vector2(-10, -5);
@@ -232,6 +236,7 @@ namespace CivilizationJourney.Dialogue
             dialogueText.color = Color.white;
             dialogueText.alignment = TextAlignmentOptions.TopLeft;
             dialogueText.lineSpacing = 10;
+            if (customFont != null) dialogueText.font = customFont;
             RectTransform dialogueTextRect = dialogueTextGO.GetComponent<RectTransform>();
             dialogueTextRect.anchorMin = Vector2.zero;
             dialogueTextRect.anchorMax = Vector2.one;
@@ -245,6 +250,7 @@ namespace CivilizationJourney.Dialogue
             continueText.fontSize = 18;
             continueText.color = new Color(1, 1, 1, 0.7f);
             continueText.alignment = TextAlignmentOptions.Right;
+            if (customFont != null) continueText.font = customFont;
             RectTransform continueRect = continueIndicator.GetComponent<RectTransform>();
             continueRect.anchorMin = new Vector2(0.7f, 0);
             continueRect.anchorMax = new Vector2(1, 0);
@@ -274,6 +280,7 @@ namespace CivilizationJourney.Dialogue
             skipText.fontSize = 22;
             skipText.color = Color.white;
             skipText.alignment = TextAlignmentOptions.Center;
+            if (customFont != null) skipText.font = customFont;
             SetFullStretch(skipTextGO.GetComponent<RectTransform>());
 
             // 通过反射设置DialogueUI的字段

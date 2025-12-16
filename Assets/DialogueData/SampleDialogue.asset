@@ -32,7 +32,7 @@ MonoBehaviour:
       backgroundImage: {fileID: 0}
       backgroundMusic: {fileID: 0}
     - characterName: "\u4E3B\u89D2"
-      portrait: {fileID: 0}
+      portrait: {fileID: 21300000, guid: b601eaf9d96614228988e8f3bbc5532a, type: 3}
       portraitPosition: 0
       portraitAnimation: 0
       dialogueText: "\u8FD9\u91CC\u5C31\u662F\u4F20\u8BF4\u4E2D\u7684\u53E4\u57CE\u5417\uFF1F\u771F\u662F\u58EE\u89C2\u554A\uFF01"
@@ -45,7 +45,7 @@ MonoBehaviour:
       backgroundImage: {fileID: 0}
       backgroundMusic: {fileID: 0}
     - characterName: "\u5411\u5BFC"
-      portrait: {fileID: 0}
+      portrait: {fileID: 21300000, guid: 2d24aa9b5a8a74197adb868baadeba63, type: 3}
       portraitPosition: 1
       portraitAnimation: 0
       dialogueText: "\u662F\u7684\uFF0C\u8FD9\u5EA7\u57CE\u5E02\u6709\u7740\u6570\u5343\u5E74\u7684\u5386\u53F2\u3002\u8BA9\u6211\u5E26\u4F60\u53C2\u89C2\u4E00\u4E0B\u5427\u3002"
