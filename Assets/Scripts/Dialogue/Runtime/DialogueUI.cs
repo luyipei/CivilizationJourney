@@ -400,7 +400,7 @@ namespace CivilizationJourney.Dialogue
             var player = FindObjectOfType<DialoguePlayer>();
             if (player != null)
             {
-                player.SkipDialogue();
+                player.SkipScene();  // 跳过当前场景，进入下一个场景
             }
         }
     }

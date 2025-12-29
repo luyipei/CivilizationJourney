@@ -260,7 +260,38 @@ namespace CivilizationJourney.Dialogue
         }
 
         /// <summary>
-        /// 跳过对话
+        /// 跳过当前场景，进入下一个场景
+        /// </summary>
+        public void SkipScene()
+        {
+            if (!isPlaying) return;
+            if (!currentDialogue.allowSkip) return;
+
+            // 停止当前打字效果
+            if (typingCoroutine != null)
+            {
+                StopCoroutine(typingCoroutine);
+                typingCoroutine = null;
+            }
+            isTyping = false;
+
+            // 跳到下一个场景
+            currentSceneIndex++;
+            currentLineIndex = 0;
+
+            // 如果没有下一个场景了，结束对话
+            if (currentSceneIndex >= currentDialogue.scenes.Count)
+            {
+                EndDialogue();
+                return;
+            }
+
+            onSceneChange?.Invoke(currentSceneIndex);
+            PlayCurrentLine();
+        }
+
+        /// <summary>
+        /// 跳过整个对话（直接结束）
         /// </summary>
         public void SkipDialogue()
         {
@@ -366,10 +397,10 @@ namespace CivilizationJourney.Dialogue
                 NextLine();
             }
 
-            // 按Escape跳过
+            // 按Escape跳过当前场景
             if (Input.GetKeyDown(KeyCode.Escape) && currentDialogue.allowSkip)
             {
-                SkipDialogue();
+                SkipScene();
             }
         }
     }
