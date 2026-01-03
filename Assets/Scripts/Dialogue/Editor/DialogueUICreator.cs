@@ -16,6 +16,7 @@ namespace CivilizationJourney.Dialogue.Editor
         {
             // 检查是否已有Canvas
             Canvas canvas = FindObjectOfType<Canvas>();
+            Debug.Log("123");
             if (canvas == null)
             {
                 // 创建Canvas
