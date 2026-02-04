@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
@@ -7,7 +8,7 @@ namespace CivilizationJourney.Dialogue
 {
     /// <summary>
     /// 对话UI控制器
-    /// 负责显示对话界面的各个元素
+    /// 参考视觉小说风格：全屏背景 + 大立绘 + 底部对话框
     /// </summary>
     public class DialogueUI : MonoBehaviour
     {
@@ -19,41 +20,49 @@ namespace CivilizationJourney.Dialogue
         [SerializeField] private Image backgroundImage;
 
         [Header("立绘")]
-        [SerializeField] private Image leftPortrait;
-        [SerializeField] private Image rightPortrait;
-        [SerializeField] private Image centerPortrait;
+        [SerializeField] private Image portraitImage;
+        [SerializeField] private RectTransform portraitRect;
 
         [Header("对话框")]
-        [SerializeField] private GameObject dialogueBox;
+        [SerializeField] private Image dialogueBoxImage;
         [SerializeField] private TextMeshProUGUI characterNameText;
+        [SerializeField] private Image nameUnderline;
         [SerializeField] private TextMeshProUGUI dialogueText;
         [SerializeField] private GameObject continueIndicator;
 
-        [Header("按钮")]
-        [SerializeField] private Button skipButton;
+        [Header("功能按钮")]
         [SerializeField] private Button autoButton;
-        [SerializeField] private Button logButton;
+        [SerializeField] private Button historyButton;
+        [SerializeField] private Button skipButton;
 
         [Header("动画设置")]
         [SerializeField] private float fadeInDuration = 0.3f;
         [SerializeField] private float fadeOutDuration = 0.3f;
-        [SerializeField] private float portraitFadeDuration = 0.2f;
+        [SerializeField] private float portraitFadeDuration = 0.25f;
+        [SerializeField] private float portraitSlideDuration = 0.3f;
 
-        [Header("立绘动画设置")]
-        [SerializeField] private float shakeIntensity = 10f;
-        [SerializeField] private float shakeDuration = 0.3f;
-        [SerializeField] private float bounceHeight = 20f;
-        [SerializeField] private float bounceDuration = 0.3f;
+        [Header("立绘位置预设")]
+        [SerializeField] private Vector2 leftPosition = new Vector2(-400, 0);
+        [SerializeField] private Vector2 rightPosition = new Vector2(400, 0);
+        [SerializeField] private Vector2 centerPosition = new Vector2(0, 0);
+
+        [Header("立绘尺寸预设")]
+        [SerializeField] private Vector2 normalSize = new Vector2(600, 900);
+        [SerializeField] private Vector2 largeSize = new Vector2(900, 1200);
+        [SerializeField] private Vector2 smallSize = new Vector2(400, 600);
 
         private Coroutine fadeCoroutine;
         private Coroutine portraitAnimCoroutine;
+        
+        // 当前状态
+        private Sprite currentBackground;
+        private bool isAutoMode = false;
 
-        // 当前激活的立绘位置
-        private PortraitPosition currentActivePosition = PortraitPosition.Left;
+        // 历史记录
+        private List<DialogueHistoryEntry> dialogueHistory = new List<DialogueHistoryEntry>();
 
         private void Awake()
         {
-            // 初始化隐藏
             if (canvasGroup != null)
             {
                 canvasGroup.alpha = 0;
@@ -61,10 +70,21 @@ namespace CivilizationJourney.Dialogue
                 canvasGroup.blocksRaycasts = false;
             }
 
-            // 隐藏所有立绘
-            HideAllPortraits();
+            // 初始隐藏立绘
+            if (portraitImage != null)
+            {
+                portraitImage.gameObject.SetActive(false);
+            }
 
             // 绑定按钮事件
+            if (autoButton != null)
+            {
+                autoButton.onClick.AddListener(OnAutoClicked);
+            }
+            if (historyButton != null)
+            {
+                historyButton.onClick.AddListener(OnHistoryClicked);
+            }
             if (skipButton != null)
             {
                 skipButton.onClick.AddListener(OnSkipClicked);
@@ -145,6 +165,30 @@ namespace CivilizationJourney.Dialogue
         }
 
         /// <summary>
+        /// 设置背景图片
+        /// </summary>
+        public void SetBackground(Sprite background)
+        {
+            if (background == null) return;
+            
+            currentBackground = background;
+            
+            if (backgroundImage != null)
+            {
+                backgroundImage.sprite = background;
+                backgroundImage.color = Color.white;
+            }
+        }
+
+        /// <summary>
+        /// 获取当前背景
+        /// </summary>
+        public Sprite GetCurrentBackground()
+        {
+            return currentBackground;
+        }
+
+        /// <summary>
         /// 设置角色名
         /// </summary>
         public void SetCharacterName(string name)
@@ -169,111 +213,37 @@ namespace CivilizationJourney.Dialogue
         /// <summary>
         /// 设置立绘
         /// </summary>
-        public void SetPortrait(Sprite portrait, PortraitPosition position, PortraitAnimation animation = PortraitAnimation.None)
+        public void SetPortrait(Sprite portrait, PortraitPosition position, PortraitSize size, 
+            PortraitAnimation animation, float offsetX, float offsetY, float scale)
         {
-            Image targetImage = GetPortraitImage(position);
-            if (targetImage == null) return;
+            if (portraitImage == null || portraitRect == null) return;
 
-            currentActivePosition = position;
+            if (portrait == null)
+            {
+                // 隐藏立绘
+                if (portraitAnimCoroutine != null)
+                {
+                    StopCoroutine(portraitAnimCoroutine);
+                }
+                portraitAnimCoroutine = StartCoroutine(FadeOutPortrait());
+                return;
+            }
 
             // 设置立绘图片
-            if (portrait != null)
-            {
-                targetImage.sprite = portrait;
-                targetImage.gameObject.SetActive(true);
-                targetImage.color = Color.white;
+            portraitImage.sprite = portrait;
+            portraitImage.preserveAspect = true;
+            portraitImage.gameObject.SetActive(true);
 
-                // 播放动画
-                PlayPortraitAnimation(targetImage, animation);
+            // 计算位置
+            Vector2 targetPos = GetPositionByEnum(position);
+            targetPos.x += offsetX;
+            targetPos.y += offsetY;
 
-                // 高亮当前说话的立绘，暗化其他立绘
-                HighlightActivePortrait(position);
-            }
-            else
-            {
-                targetImage.gameObject.SetActive(false);
-            }
-        }
+            // 计算尺寸
+            Vector2 targetSize = GetSizeByEnum(size);
+            targetSize *= scale;
 
-        /// <summary>
-        /// 高亮当前说话的立绘
-        /// </summary>
-        private void HighlightActivePortrait(PortraitPosition activePosition)
-        {
-            Color activeColor = Color.white;
-            Color inactiveColor = new Color(0.6f, 0.6f, 0.6f, 1f);
-
-            if (leftPortrait != null && leftPortrait.gameObject.activeSelf)
-            {
-                leftPortrait.color = activePosition == PortraitPosition.Left ? activeColor : inactiveColor;
-            }
-
-            if (rightPortrait != null && rightPortrait.gameObject.activeSelf)
-            {
-                rightPortrait.color = activePosition == PortraitPosition.Right ? activeColor : inactiveColor;
-            }
-
-            if (centerPortrait != null && centerPortrait.gameObject.activeSelf)
-            {
-                centerPortrait.color = activePosition == PortraitPosition.Center ? activeColor : inactiveColor;
-            }
-        }
-
-        /// <summary>
-        /// 隐藏对方立绘
-        /// </summary>
-        public void HideOtherPortrait(PortraitPosition currentPosition)
-        {
-            if (currentPosition != PortraitPosition.Left && leftPortrait != null)
-            {
-                StartCoroutine(FadeOutPortrait(leftPortrait));
-            }
-
-            if (currentPosition != PortraitPosition.Right && rightPortrait != null)
-            {
-                StartCoroutine(FadeOutPortrait(rightPortrait));
-            }
-
-            if (currentPosition != PortraitPosition.Center && centerPortrait != null)
-            {
-                StartCoroutine(FadeOutPortrait(centerPortrait));
-            }
-        }
-
-        /// <summary>
-        /// 隐藏所有立绘
-        /// </summary>
-        public void HideAllPortraits()
-        {
-            if (leftPortrait != null) leftPortrait.gameObject.SetActive(false);
-            if (rightPortrait != null) rightPortrait.gameObject.SetActive(false);
-            if (centerPortrait != null) centerPortrait.gameObject.SetActive(false);
-        }
-
-        private IEnumerator FadeOutPortrait(Image portrait)
-        {
-            if (portrait == null || !portrait.gameObject.activeSelf) yield break;
-
-            float elapsed = 0;
-            Color startColor = portrait.color;
-            Color endColor = new Color(startColor.r, startColor.g, startColor.b, 0);
-
-            while (elapsed < portraitFadeDuration)
-            {
-                elapsed += Time.unscaledDeltaTime;
-                portrait.color = Color.Lerp(startColor, endColor, elapsed / portraitFadeDuration);
-                yield return null;
-            }
-
-            portrait.gameObject.SetActive(false);
-            portrait.color = Color.white;
-        }
-
-        /// <summary>
-        /// 播放立绘动画
-        /// </summary>
-        private void PlayPortraitAnimation(Image portrait, PortraitAnimation animation)
-        {
+            // 播放动画
             if (portraitAnimCoroutine != null)
             {
                 StopCoroutine(portraitAnimCoroutine);
@@ -282,81 +252,189 @@ namespace CivilizationJourney.Dialogue
             switch (animation)
             {
                 case PortraitAnimation.FadeIn:
-                    portraitAnimCoroutine = StartCoroutine(FadeInPortrait(portrait));
+                    portraitAnimCoroutine = StartCoroutine(AnimateFadeIn(targetPos, targetSize));
+                    break;
+                case PortraitAnimation.SlideIn:
+                    portraitAnimCoroutine = StartCoroutine(AnimateSlideIn(targetPos, targetSize, position));
                     break;
                 case PortraitAnimation.Shake:
-                    portraitAnimCoroutine = StartCoroutine(ShakePortrait(portrait));
+                    SetPortraitImmediate(targetPos, targetSize);
+                    portraitAnimCoroutine = StartCoroutine(AnimateShake());
                     break;
                 case PortraitAnimation.Bounce:
-                    portraitAnimCoroutine = StartCoroutine(BouncePortrait(portrait));
+                    SetPortraitImmediate(targetPos, targetSize);
+                    portraitAnimCoroutine = StartCoroutine(AnimateBounce());
+                    break;
+                default:
+                    SetPortraitImmediate(targetPos, targetSize);
                     break;
             }
         }
 
-        private IEnumerator FadeInPortrait(Image portrait)
+        /// <summary>
+        /// 隐藏立绘
+        /// </summary>
+        public void HidePortrait()
         {
+            if (portraitAnimCoroutine != null)
+            {
+                StopCoroutine(portraitAnimCoroutine);
+            }
+            portraitAnimCoroutine = StartCoroutine(FadeOutPortrait());
+        }
+
+        private void SetPortraitImmediate(Vector2 position, Vector2 size)
+        {
+            portraitRect.anchoredPosition = position;
+            portraitRect.sizeDelta = size;
+            portraitImage.color = Color.white;
+        }
+
+        private Vector2 GetPositionByEnum(PortraitPosition position)
+        {
+            switch (position)
+            {
+                case PortraitPosition.Left:
+                    return leftPosition;
+                case PortraitPosition.Right:
+                    return rightPosition;
+                case PortraitPosition.Center:
+                    return centerPosition;
+                case PortraitPosition.LeftFar:
+                    return new Vector2(leftPosition.x - 200, leftPosition.y);
+                case PortraitPosition.RightFar:
+                    return new Vector2(rightPosition.x + 200, rightPosition.y);
+                default:
+                    return rightPosition;
+            }
+        }
+
+        private Vector2 GetSizeByEnum(PortraitSize size)
+        {
+            switch (size)
+            {
+                case PortraitSize.Normal:
+                    return normalSize;
+                case PortraitSize.Large:
+                    return largeSize;
+                case PortraitSize.Small:
+                    return smallSize;
+                default:
+                    return largeSize;
+            }
+        }
+
+        #region Portrait Animations
+
+        private IEnumerator AnimateFadeIn(Vector2 targetPos, Vector2 targetSize)
+        {
+            portraitRect.anchoredPosition = targetPos;
+            portraitRect.sizeDelta = targetSize;
+            
             float elapsed = 0;
             Color startColor = new Color(1, 1, 1, 0);
             Color endColor = Color.white;
-
-            portrait.color = startColor;
+            portraitImage.color = startColor;
 
             while (elapsed < portraitFadeDuration)
             {
                 elapsed += Time.unscaledDeltaTime;
-                portrait.color = Color.Lerp(startColor, endColor, elapsed / portraitFadeDuration);
+                portraitImage.color = Color.Lerp(startColor, endColor, elapsed / portraitFadeDuration);
                 yield return null;
             }
 
-            portrait.color = endColor;
+            portraitImage.color = endColor;
         }
 
-        private IEnumerator ShakePortrait(Image portrait)
+        private IEnumerator AnimateSlideIn(Vector2 targetPos, Vector2 targetSize, PortraitPosition position)
         {
-            RectTransform rect = portrait.rectTransform;
-            Vector3 originalPos = rect.localPosition;
-            float elapsed = 0;
+            portraitRect.sizeDelta = targetSize;
+            portraitImage.color = Color.white;
 
-            while (elapsed < shakeDuration)
+            // 从屏幕外滑入
+            Vector2 startPos = targetPos;
+            if (position == PortraitPosition.Left || position == PortraitPosition.LeftFar)
+            {
+                startPos.x -= 500;
+            }
+            else
+            {
+                startPos.x += 500;
+            }
+
+            portraitRect.anchoredPosition = startPos;
+
+            float elapsed = 0;
+            while (elapsed < portraitSlideDuration)
             {
                 elapsed += Time.unscaledDeltaTime;
-                float x = originalPos.x + Random.Range(-shakeIntensity, shakeIntensity);
-                float y = originalPos.y + Random.Range(-shakeIntensity, shakeIntensity);
-                rect.localPosition = new Vector3(x, y, originalPos.z);
+                float t = elapsed / portraitSlideDuration;
+                t = 1 - Mathf.Pow(1 - t, 3); // Ease out cubic
+                portraitRect.anchoredPosition = Vector2.Lerp(startPos, targetPos, t);
                 yield return null;
             }
 
-            rect.localPosition = originalPos;
+            portraitRect.anchoredPosition = targetPos;
         }
 
-        private IEnumerator BouncePortrait(Image portrait)
+        private IEnumerator AnimateShake()
         {
-            RectTransform rect = portrait.rectTransform;
-            Vector3 originalPos = rect.localPosition;
+            Vector2 originalPos = portraitRect.anchoredPosition;
+            float duration = 0.3f;
+            float intensity = 15f;
             float elapsed = 0;
 
-            while (elapsed < bounceDuration)
+            while (elapsed < duration)
             {
                 elapsed += Time.unscaledDeltaTime;
-                float progress = elapsed / bounceDuration;
-                float bounce = Mathf.Sin(progress * Mathf.PI) * bounceHeight;
-                rect.localPosition = new Vector3(originalPos.x, originalPos.y + bounce, originalPos.z);
+                float x = originalPos.x + Random.Range(-intensity, intensity);
+                float y = originalPos.y + Random.Range(-intensity, intensity);
+                portraitRect.anchoredPosition = new Vector2(x, y);
                 yield return null;
             }
 
-            rect.localPosition = originalPos;
+            portraitRect.anchoredPosition = originalPos;
         }
 
-        /// <summary>
-        /// 设置背景图片
-        /// </summary>
-        public void SetBackground(Sprite background)
+        private IEnumerator AnimateBounce()
         {
-            if (backgroundImage != null && background != null)
+            Vector2 originalPos = portraitRect.anchoredPosition;
+            float duration = 0.4f;
+            float bounceHeight = 30f;
+            float elapsed = 0;
+
+            while (elapsed < duration)
             {
-                backgroundImage.sprite = background;
+                elapsed += Time.unscaledDeltaTime;
+                float t = elapsed / duration;
+                float bounce = Mathf.Sin(t * Mathf.PI) * bounceHeight;
+                portraitRect.anchoredPosition = new Vector2(originalPos.x, originalPos.y + bounce);
+                yield return null;
             }
+
+            portraitRect.anchoredPosition = originalPos;
         }
+
+        private IEnumerator FadeOutPortrait()
+        {
+            if (!portraitImage.gameObject.activeSelf) yield break;
+
+            float elapsed = 0;
+            Color startColor = portraitImage.color;
+            Color endColor = new Color(1, 1, 1, 0);
+
+            while (elapsed < portraitFadeDuration)
+            {
+                elapsed += Time.unscaledDeltaTime;
+                portraitImage.color = Color.Lerp(startColor, endColor, elapsed / portraitFadeDuration);
+                yield return null;
+            }
+
+            portraitImage.gameObject.SetActive(false);
+            portraitImage.color = Color.white;
+        }
+
+        #endregion
 
         /// <summary>
         /// 设置跳过按钮是否可用
@@ -380,19 +458,52 @@ namespace CivilizationJourney.Dialogue
             }
         }
 
-        private Image GetPortraitImage(PortraitPosition position)
+        /// <summary>
+        /// 添加历史记录
+        /// </summary>
+        public void AddToHistory(string characterName, string dialogueText)
         {
-            switch (position)
+            dialogueHistory.Add(new DialogueHistoryEntry
             {
-                case PortraitPosition.Left:
-                    return leftPortrait;
-                case PortraitPosition.Right:
-                    return rightPortrait;
-                case PortraitPosition.Center:
-                    return centerPortrait;
-                default:
-                    return leftPortrait;
+                characterName = characterName,
+                dialogueText = dialogueText
+            });
+
+            // 限制历史记录数量
+            if (dialogueHistory.Count > 100)
+            {
+                dialogueHistory.RemoveAt(0);
             }
+        }
+
+        /// <summary>
+        /// 获取自动播放状态
+        /// </summary>
+        public bool IsAutoMode => isAutoMode;
+
+        #region Button Callbacks
+
+        private void OnAutoClicked()
+        {
+            isAutoMode = !isAutoMode;
+            
+            // 更新按钮显示
+            if (autoButton != null)
+            {
+                var text = autoButton.GetComponentInChildren<TextMeshProUGUI>();
+                if (text != null)
+                {
+                    text.text = isAutoMode ? "自动 ■" : "自动 ▶";
+                }
+            }
+
+            Debug.Log("自动播放: " + (isAutoMode ? "开启" : "关闭"));
+        }
+
+        private void OnHistoryClicked()
+        {
+            // TODO: 显示历史对话窗口
+            Debug.Log("历史对话 - 共 " + dialogueHistory.Count + " 条记录");
         }
 
         private void OnSkipClicked()
@@ -400,8 +511,20 @@ namespace CivilizationJourney.Dialogue
             var player = FindObjectOfType<DialoguePlayer>();
             if (player != null)
             {
-                player.SkipScene();  // 跳过当前场景，进入下一个场景
+                player.SkipScene();
             }
         }
+
+        #endregion
+    }
+
+    /// <summary>
+    /// 对话历史记录条目
+    /// </summary>
+    [System.Serializable]
+    public class DialogueHistoryEntry
+    {
+        public string characterName;
+        public string dialogueText;
     }
 }

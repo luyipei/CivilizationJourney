@@ -27,6 +27,11 @@ namespace CivilizationJourney.Dialogue
         private bool isPlaying = false;
         private bool isTyping = false;
         private Coroutine typingCoroutine;
+        private Coroutine autoPlayCoroutine;
+
+        // 当前背景和BGM（用于继承）
+        private Sprite currentBackground;
+        private AudioClip currentBGM;
 
         // 事件
         public UnityEvent onDialogueStart;
@@ -96,6 +101,10 @@ namespace CivilizationJourney.Dialogue
             currentLineIndex = 0;
             isPlaying = true;
 
+            // 初始化背景和BGM
+            currentBackground = dialogue.defaultBackground;
+            currentBGM = dialogue.defaultBGM;
+
             if (pauseGameOnDialogue)
             {
                 Time.timeScale = 0;
@@ -105,6 +114,18 @@ namespace CivilizationJourney.Dialogue
             {
                 dialogueUI.Show();
                 dialogueUI.SetSkipButtonActive(currentDialogue.allowSkip);
+                
+                // 设置初始背景
+                if (currentBackground != null)
+                {
+                    dialogueUI.SetBackground(currentBackground);
+                }
+            }
+
+            // 播放初始BGM
+            if (currentBGM != null)
+            {
+                PlayBGM(currentBGM);
             }
 
             onDialogueStart?.Invoke();
@@ -123,22 +144,53 @@ namespace CivilizationJourney.Dialogue
                 return;
             }
 
+            var scene = GetCurrentScene();
+
             onLineStart?.Invoke(line);
 
             if (dialogueUI != null)
             {
-                dialogueUI.SetCharacterName(line.characterName);
-                dialogueUI.SetPortrait(line.portrait, line.portraitPosition, line.portraitAnimation);
-                
-                if (line.hideOtherPortrait)
-                {
-                    dialogueUI.HideOtherPortrait(line.portraitPosition);
-                }
-
+                // 处理背景：对话行 > 场景 > 全局 > 继承上一个
+                Sprite bgToUse = null;
                 if (line.backgroundImage != null)
                 {
-                    dialogueUI.SetBackground(line.backgroundImage);
+                    bgToUse = line.backgroundImage;
                 }
+                else if (scene != null && scene.sceneBackground != null && currentLineIndex == 0)
+                {
+                    // 场景开始时使用场景背景
+                    bgToUse = scene.sceneBackground;
+                }
+
+                if (bgToUse != null)
+                {
+                    currentBackground = bgToUse;
+                    dialogueUI.SetBackground(bgToUse);
+                }
+
+                // 设置角色名
+                dialogueUI.SetCharacterName(line.characterName);
+
+                // 设置立绘
+                if (line.hidePortrait)
+                {
+                    dialogueUI.HidePortrait();
+                }
+                else
+                {
+                    dialogueUI.SetPortrait(
+                        line.portrait,
+                        line.portraitPosition,
+                        line.portraitSize,
+                        line.portraitAnimation,
+                        line.portraitOffsetX,
+                        line.portraitOffsetY,
+                        line.portraitScale
+                    );
+                }
+
+                // 添加到历史记录
+                dialogueUI.AddToHistory(line.characterName, line.dialogueText);
 
                 // 开始打字效果
                 if (typingCoroutine != null)
@@ -154,10 +206,21 @@ namespace CivilizationJourney.Dialogue
                 PlayVoice(line.voiceClip);
             }
 
-            // 播放背景音乐
+            // 处理BGM：对话行 > 场景 > 继承
+            AudioClip bgmToUse = null;
             if (line.backgroundMusic != null)
             {
-                PlayBGM(line.backgroundMusic);
+                bgmToUse = line.backgroundMusic;
+            }
+            else if (scene != null && scene.sceneBGM != null && currentLineIndex == 0)
+            {
+                bgmToUse = scene.sceneBGM;
+            }
+
+            if (bgmToUse != null && bgmToUse != currentBGM)
+            {
+                currentBGM = bgmToUse;
+                PlayBGM(bgmToUse);
             }
         }
 
@@ -167,8 +230,12 @@ namespace CivilizationJourney.Dialogue
         private IEnumerator TypeText(DialogueLine line)
         {
             isTyping = true;
+            dialogueUI?.SetContinueIndicator(false);
+            
             string fullText = line.dialogueText;
             string currentText = "";
+
+            float speed = line.typingSpeed > 0 ? line.typingSpeed : currentDialogue.defaultTypingSpeed;
 
             for (int i = 0; i < fullText.Length; i++)
             {
@@ -181,16 +248,26 @@ namespace CivilizationJourney.Dialogue
                     PlayTypingSound(line.typingSound);
                 }
 
-                yield return new WaitForSecondsRealtime(line.typingSpeed);
+                yield return new WaitForSecondsRealtime(speed);
             }
 
             isTyping = false;
+            dialogueUI?.SetContinueIndicator(true);
             onLineEnd?.Invoke(line);
 
-            // 自动播放下一句
-            if (line.autoNext)
+            // 自动播放模式或对话行设置了自动播放
+            if (line.autoNext || (dialogueUI != null && dialogueUI.IsAutoMode))
             {
-                yield return new WaitForSecondsRealtime(line.autoNextDelay);
+                float delay = line.autoNext ? line.autoNextDelay : 1.5f;
+                autoPlayCoroutine = StartCoroutine(AutoPlayNext(delay));
+            }
+        }
+
+        private IEnumerator AutoPlayNext(float delay)
+        {
+            yield return new WaitForSecondsRealtime(delay);
+            if (isPlaying && !isTyping)
+            {
                 NextLine();
             }
         }
@@ -201,6 +278,13 @@ namespace CivilizationJourney.Dialogue
         public void NextLine()
         {
             if (!isPlaying) return;
+
+            // 停止自动播放协程
+            if (autoPlayCoroutine != null)
+            {
+                StopCoroutine(autoPlayCoroutine);
+                autoPlayCoroutine = null;
+            }
 
             // 如果正在打字，先完成打字
             if (isTyping)
@@ -253,10 +337,17 @@ namespace CivilizationJourney.Dialogue
             if (line != null && dialogueUI != null)
             {
                 dialogueUI.SetDialogueText(line.dialogueText);
+                dialogueUI.SetContinueIndicator(true);
             }
 
             isTyping = false;
             onLineEnd?.Invoke(line);
+
+            // 自动播放模式
+            if (dialogueUI != null && dialogueUI.IsAutoMode)
+            {
+                autoPlayCoroutine = StartCoroutine(AutoPlayNext(1.5f));
+            }
         }
 
         /// <summary>
@@ -267,11 +358,16 @@ namespace CivilizationJourney.Dialogue
             if (!isPlaying) return;
             if (!currentDialogue.allowSkip) return;
 
-            // 停止当前打字效果
+            // 停止当前协程
             if (typingCoroutine != null)
             {
                 StopCoroutine(typingCoroutine);
                 typingCoroutine = null;
+            }
+            if (autoPlayCoroutine != null)
+            {
+                StopCoroutine(autoPlayCoroutine);
+                autoPlayCoroutine = null;
             }
             isTyping = false;
 
@@ -310,6 +406,11 @@ namespace CivilizationJourney.Dialogue
             {
                 StopCoroutine(typingCoroutine);
                 typingCoroutine = null;
+            }
+            if (autoPlayCoroutine != null)
+            {
+                StopCoroutine(autoPlayCoroutine);
+                autoPlayCoroutine = null;
             }
 
             isPlaying = false;
@@ -371,20 +472,47 @@ namespace CivilizationJourney.Dialogue
         }
 
         // 音频播放方法（可根据项目需求扩展）
+        private AudioSource bgmSource;
+        private AudioSource voiceSource;
+        private AudioSource sfxSource;
+
         private void PlayVoice(AudioClip clip)
         {
-            // TODO: 实现语音播放
-            // AudioSource.PlayClipAtPoint(clip, Camera.main.transform.position);
+            if (voiceSource == null)
+            {
+                voiceSource = gameObject.AddComponent<AudioSource>();
+                voiceSource.playOnAwake = false;
+            }
+            voiceSource.clip = clip;
+            voiceSource.Play();
         }
 
         private void PlayTypingSound(AudioClip clip)
         {
-            // TODO: 实现打字音效播放
+            if (sfxSource == null)
+            {
+                sfxSource = gameObject.AddComponent<AudioSource>();
+                sfxSource.playOnAwake = false;
+                sfxSource.volume = 0.5f;
+            }
+            sfxSource.PlayOneShot(clip);
         }
 
         private void PlayBGM(AudioClip clip)
         {
-            // TODO: 实现背景音乐播放
+            if (bgmSource == null)
+            {
+                bgmSource = gameObject.AddComponent<AudioSource>();
+                bgmSource.playOnAwake = false;
+                bgmSource.loop = true;
+                bgmSource.volume = 0.7f;
+            }
+            
+            if (bgmSource.clip != clip)
+            {
+                bgmSource.clip = clip;
+                bgmSource.Play();
+            }
         }
 
         private void Update()

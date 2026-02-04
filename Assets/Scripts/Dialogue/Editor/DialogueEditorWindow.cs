@@ -357,7 +357,7 @@ namespace CivilizationJourney.Dialogue.Editor
             line.portrait = (Sprite)EditorGUILayout.ObjectField("立绘", line.portrait, typeof(Sprite), false);
             line.portraitPosition = (PortraitPosition)EditorGUILayout.EnumPopup("立绘位置", line.portraitPosition);
             line.portraitAnimation = (PortraitAnimation)EditorGUILayout.EnumPopup("立绘动画", line.portraitAnimation);
-            line.hideOtherPortrait = EditorGUILayout.Toggle("隐藏对方立绘", line.hideOtherPortrait);
+            line.hidePortrait = EditorGUILayout.Toggle("隐藏立绘", line.hidePortrait);
 
             // 立绘预览
             if (line.portrait != null)
@@ -697,7 +697,7 @@ namespace CivilizationJourney.Dialogue.Editor
                 typingSound = original.typingSound,
                 autoNext = original.autoNext,
                 autoNextDelay = original.autoNextDelay,
-                hideOtherPortrait = original.hideOtherPortrait,
+                hidePortrait = original.hidePortrait,
                 backgroundImage = original.backgroundImage,
                 backgroundMusic = original.backgroundMusic
             };

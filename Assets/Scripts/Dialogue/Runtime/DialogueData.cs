@@ -9,9 +9,21 @@ namespace CivilizationJourney.Dialogue
     /// </summary>
     public enum PortraitPosition
     {
-        Left,   // 左侧立绘
-        Right,  // 右侧立绘
-        Center  // 中间立绘
+        Left,       // 左侧立绘
+        Right,      // 右侧立绘
+        Center,     // 中间立绘
+        LeftFar,    // 左侧远处（较小）
+        RightFar    // 右侧远处（较小）
+    }
+
+    /// <summary>
+    /// 立绘尺寸
+    /// </summary>
+    public enum PortraitSize
+    {
+        Normal,     // 正常大小
+        Large,      // 放大（半身像，如参考图）
+        Small       // 缩小
     }
 
     /// <summary>
@@ -23,7 +35,9 @@ namespace CivilizationJourney.Dialogue
         FadeIn,     // 淡入
         FadeOut,    // 淡出
         Shake,      // 抖动
-        Bounce      // 弹跳
+        Bounce,     // 弹跳
+        SlideIn,    // 滑入
+        SlideOut    // 滑出
     }
 
     /// <summary>
@@ -36,14 +50,29 @@ namespace CivilizationJourney.Dialogue
         [Tooltip("说话角色的名字")]
         public string characterName;
         
-        [Tooltip("角色立绘")]
+        [Tooltip("角色立绘（半身像）")]
         public Sprite portrait;
         
         [Tooltip("立绘位置")]
-        public PortraitPosition portraitPosition = PortraitPosition.Left;
+        public PortraitPosition portraitPosition = PortraitPosition.Right;
+        
+        [Tooltip("立绘尺寸")]
+        public PortraitSize portraitSize = PortraitSize.Large;
         
         [Tooltip("立绘动画")]
         public PortraitAnimation portraitAnimation = PortraitAnimation.None;
+        
+        [Tooltip("立绘水平偏移（正值向右，负值向左）")]
+        [Range(-500f, 500f)]
+        public float portraitOffsetX = 0f;
+        
+        [Tooltip("立绘垂直偏移（正值向上，负值向下）")]
+        [Range(-300f, 300f)]
+        public float portraitOffsetY = 0f;
+        
+        [Tooltip("立绘缩放比例")]
+        [Range(0.5f, 2f)]
+        public float portraitScale = 1f;
 
         [Header("对话内容")]
         [TextArea(3, 10)]
@@ -54,12 +83,19 @@ namespace CivilizationJourney.Dialogue
         [Range(0.01f, 0.2f)]
         public float typingSpeed = 0.05f;
 
+        [Header("背景设置")]
+        [Tooltip("背景图片（留空则继承上一句的背景）")]
+        public Sprite backgroundImage;
+
         [Header("音效")]
-        [Tooltip("对话音效")]
+        [Tooltip("语音")]
         public AudioClip voiceClip;
         
         [Tooltip("打字音效")]
         public AudioClip typingSound;
+        
+        [Tooltip("背景音乐（留空则继承上一句的BGM）")]
+        public AudioClip backgroundMusic;
 
         [Header("高级设置")]
         [Tooltip("是否自动播放下一句")]
@@ -69,14 +105,8 @@ namespace CivilizationJourney.Dialogue
         [Range(0f, 5f)]
         public float autoNextDelay = 2f;
         
-        [Tooltip("是否隐藏对方立绘")]
-        public bool hideOtherPortrait = false;
-
-        [Tooltip("背景图片（可选，留空则保持当前背景）")]
-        public Sprite backgroundImage;
-
-        [Tooltip("背景音乐（可选，留空则保持当前BGM）")]
-        public AudioClip backgroundMusic;
+        [Tooltip("是否隐藏立绘")]
+        public bool hidePortrait = false;
     }
 
     /// <summary>
@@ -91,6 +121,12 @@ namespace CivilizationJourney.Dialogue
         [Tooltip("场景描述")]
         [TextArea(2, 5)]
         public string sceneDescription;
+        
+        [Tooltip("场景默认背景（该场景所有对话的默认背景）")]
+        public Sprite sceneBackground;
+        
+        [Tooltip("场景默认BGM")]
+        public AudioClip sceneBGM;
         
         [Tooltip("该场景的对话列表")]
         public List<DialogueLine> dialogueLines = new List<DialogueLine>();
@@ -110,6 +146,13 @@ namespace CivilizationJourney.Dialogue
         [Tooltip("对话/剧情描述")]
         [TextArea(3, 5)]
         public string dialogueDescription;
+
+        [Header("全局背景")]
+        [Tooltip("默认背景图片（所有场景的默认背景）")]
+        public Sprite defaultBackground;
+        
+        [Tooltip("默认背景音乐")]
+        public AudioClip defaultBGM;
 
         [Header("场景列表")]
         [Tooltip("对话场景列表")]
